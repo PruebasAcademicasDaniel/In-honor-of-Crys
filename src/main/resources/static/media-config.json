@@ -1,12 +1,8 @@
 {
   "photos": [
     {
-      "src": "/img/photo-1.png",
-      "caption": "Preciosa"
-    },
-    {
       "src": "/img/photo-2.jpeg",
-      "caption": "Vino"
+      "caption": "Precioso vino"
     },
     {
       "src": "/img/photo-3.jpeg",
