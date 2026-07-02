@@ -2,16 +2,21 @@
  * Pagina "Para ti"
  * -----------------
  * Lee /api/media (fotos + cancion opcional) y arma la escena.
- * Preparado para escalar: si "photos" tiene mas de un elemento,
- * se muestran en secuencia con puntos indicadores, sin cambiar nada mas.
+ * Si "photos" tiene mas de un elemento, se muestran en secuencia
+ * (automatica + boton de flecha para avanzar manualmente).
  */
 (function () {
   const scene = document.getElementById('scene');
   const loader = document.getElementById('loader');
   const soundToggle = document.getElementById('soundToggle');
   const bgAudio = document.getElementById('bgAudio');
+  const nextBtn = document.getElementById('nextBtn');
 
   const SLIDE_DURATION_MS = 6000;
+
+  let current = 0;
+  let total = 0;
+  let timer = null;
 
   fetch('/api/media')
     .then((res) => res.json())
@@ -26,6 +31,7 @@
     }
 
     loader.remove();
+    total = photos.length;
 
     // ---- Construir slides ----
     photos.forEach((photo, index) => {
@@ -41,30 +47,41 @@
       const scrim = document.createElement('div');
       scrim.className = 'slide__scrim';
 
-      const caption = document.createElement('div');
-      caption.className = 'caption';
-      caption.innerHTML = `
-        <div class="caption__mark"></div>
-        <p class="caption__text">${escapeHtml(photo.caption || '')}</p>
-      `;
-
       slide.appendChild(img);
       slide.appendChild(scrim);
-      slide.appendChild(caption);
+
+      if (photo.caption && photo.caption.trim() !== '') {
+        const caption = document.createElement('div');
+        caption.className = 'caption';
+        caption.innerHTML = `
+          <div class="caption__mark"></div>
+          <p class="caption__text">${escapeHtml(photo.caption)}</p>
+        `;
+        slide.appendChild(caption);
+      }
+
       scene.appendChild(slide);
     });
 
-    // ---- Puntos indicadores (solo si hay mas de 1 foto) ----
-    if (photos.length > 1) {
-      const dots = document.createElement('div');
-      dots.className = 'dots';
+    // ---- Puntos indicadores + flecha (solo si hay mas de 1 foto) ----
+    let dotsEl = null;
+    if (total > 1) {
+      dotsEl = document.createElement('div');
+      dotsEl.className = 'dots';
       photos.forEach((_, index) => {
         const dot = document.createElement('span');
         if (index === 0) dot.className = 'is-active';
-        dots.appendChild(dot);
+        dotsEl.appendChild(dot);
       });
-      scene.appendChild(dots);
-      startCarousel(photos.length, dots);
+      scene.appendChild(dotsEl);
+
+      nextBtn.hidden = false;
+      nextBtn.addEventListener('click', () => {
+        goTo(current + 1, dotsEl);
+        resetTimer(dotsEl);
+      });
+
+      startCarousel(dotsEl);
     }
 
     // ---- Cancion de fondo (opcional) ----
@@ -73,20 +90,26 @@
     }
   }
 
-  function startCarousel(total, dotsEl) {
-    let current = 0;
-    setInterval(() => {
-      const slides = scene.querySelectorAll('.slide');
-      const dots = dotsEl.querySelectorAll('span');
+  function goTo(index, dotsEl) {
+    const slides = scene.querySelectorAll('.slide');
+    const dots = dotsEl.querySelectorAll('span');
 
-      slides[current].classList.remove('is-active');
-      dots[current].classList.remove('is-active');
+    slides[current].classList.remove('is-active');
+    dots[current].classList.remove('is-active');
 
-      current = (current + 1) % total;
+    current = (index + total) % total;
 
-      slides[current].classList.add('is-active');
-      dots[current].classList.add('is-active');
-    }, SLIDE_DURATION_MS);
+    slides[current].classList.add('is-active');
+    dots[current].classList.add('is-active');
+  }
+
+  function startCarousel(dotsEl) {
+    timer = setInterval(() => goTo(current + 1, dotsEl), SLIDE_DURATION_MS);
+  }
+
+  function resetTimer(dotsEl) {
+    clearInterval(timer);
+    startCarousel(dotsEl);
   }
 
   function setupAudio(src) {

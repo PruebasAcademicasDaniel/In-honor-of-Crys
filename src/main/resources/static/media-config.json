@@ -2,7 +2,15 @@
   "photos": [
     {
       "src": "/img/photo-1.png",
-      "caption": "Eres todo lo que quiero cuando no buscaba nada."
+      "caption": "Preciosa"
+    },
+    {
+      "src": "/img/photo-2.jpeg",
+      "caption": "Vino"
+    },
+    {
+      "src": "/img/photo-3.jpeg",
+      "caption": "Eres todo lo que quiero aun cuando no buscaba nada."
     }
   ],
   "song": null

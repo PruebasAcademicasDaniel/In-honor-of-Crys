@@ -1,28 +1,34 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#2b241d">
-<title>Para ti</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#2b241d">
+    <title>Para ti</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 
 <main id="scene" class="scene" aria-live="polite">
-  <div class="loader" id="loader">
-    <span></span>
-  </div>
+    <div class="loader" id="loader">
+        <span></span>
+    </div>
 </main>
 
 <button id="soundToggle" class="sound-toggle" hidden aria-label="Reproducir musica">
-  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6">
-    <path d="M4 9v6h4l5 5V4L8 9H4z"/>
-    <path id="waveIcon" d="M16.5 8.5a5 5 0 0 1 0 7"/>
-  </svg>
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M4 9v6h4l5 5V4L8 9H4z"/>
+        <path id="waveIcon" d="M16.5 8.5a5 5 0 0 1 0 7"/>
+    </svg>
+</button>
+
+<button id="nextBtn" class="next-btn" hidden aria-label="Ver siguiente foto">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M9 6l6 6-6 6"/>
+    </svg>
 </button>
 
 <audio id="bgAudio" loop preload="none"></audio>
