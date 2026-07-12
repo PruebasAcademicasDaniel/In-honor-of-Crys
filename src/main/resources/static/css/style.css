@@ -375,6 +375,12 @@ body {
   padding: 80px 24px 40px;
 }
 
+#photosScreen {
+  background:
+    linear-gradient(to bottom, var(--overlay-bottom) 0%, rgba(15,10,6,0.55) 45%, var(--overlay-bottom) 100%),
+    url('/img/photo-4.jpeg') center/cover no-repeat;
+}
+
 .upload__form,
 .upload__view {
   width: min(88vw, 380px);
