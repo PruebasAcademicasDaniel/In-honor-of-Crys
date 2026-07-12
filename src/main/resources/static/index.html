@@ -21,7 +21,7 @@
     <h1 id="coverTitle" class="cover__title">Our Story</h1>
     <div class="cover__actions">
         <button id="viewPhotosBtn" class="cover__btn cover__btn--primary" type="button">Ver nuestras fotos</button>
-        <button id="uploadPhotosBtn" class="cover__btn" type="button">Subir fotos</button>
+        <button id="settingsBtn" class="cover__btn" type="button">Configuración</button>
     </div>
 </section>
 
@@ -52,7 +52,7 @@
     </button>
 </main>
 
-<!-- ---------- Subir fotos ---------- -->
+<!-- ---------- Configuracion ---------- -->
 <section id="uploadScreen" class="upload" hidden>
     <button class="back-btn" data-back aria-label="Volver a la portada">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -60,8 +60,43 @@
         </svg>
     </button>
 
-    <form id="uploadForm" class="upload__form">
+    <!-- Menu principal -->
+    <div id="settingsMenuView" class="upload__view">
+        <h2 class="upload__title">Configuración</h2>
+        <div class="upload__menu">
+            <button id="goUploadBtn" class="upload__submit" type="button">Subir fotos</button>
+            <button id="goDeleteBtn" class="upload__submit upload__submit--ghost" type="button">Eliminar fotos</button>
+        </div>
+    </div>
+
+    <!-- Lista de albumes (subir) -->
+    <div id="albumListView" class="upload__view" hidden>
+        <button type="button" class="upload__link" data-back-to="settingsMenuView">‹ Configuración</button>
+        <h2 class="upload__title">Álbumes</h2>
+        <button id="createAlbumBtn" class="upload__submit upload__submit--ghost" type="button">+ Crear álbum</button>
+        <div id="albumGrid" class="album-grid"></div>
+    </div>
+
+    <!-- Crear album -->
+    <form id="createAlbumForm" class="upload__form upload__view" hidden>
+        <button type="button" class="upload__link" data-back-to="albumListView">‹ Álbumes</button>
+        <h2 class="upload__title">Nuevo álbum</h2>
+
+        <label class="upload__label" for="albumName">Nombre</label>
+        <input class="upload__input" type="text" id="albumName" name="name" maxlength="60" required>
+
+        <label class="upload__label" for="albumPin">PIN</label>
+        <input class="upload__input" type="password" id="albumPin" name="pin" inputmode="numeric" autocomplete="off" required>
+
+        <button class="upload__submit" type="submit">Crear álbum</button>
+        <p id="createAlbumStatus" class="upload__status" role="status"></p>
+    </form>
+
+    <!-- Subir foto dentro de un album -->
+    <form id="uploadForm" class="upload__form upload__view" hidden>
+        <button type="button" class="upload__link" data-back-to="albumListView">‹ Álbumes</button>
         <h2 class="upload__title">Sumar una foto</h2>
+        <p id="uploadAlbumLabel" class="upload__subtitle"></p>
 
         <label class="upload__label" for="uploadPin">PIN</label>
         <input class="upload__input" type="password" id="uploadPin" name="pin" inputmode="numeric" autocomplete="off" required>
@@ -75,6 +110,25 @@
         <button class="upload__submit" type="submit">Subir foto</button>
         <p id="uploadStatus" class="upload__status" role="status"></p>
     </form>
+
+    <!-- Lista de albumes (eliminar) -->
+    <div id="deleteAlbumListView" class="upload__view" hidden>
+        <button type="button" class="upload__link" data-back-to="settingsMenuView">‹ Configuración</button>
+        <h2 class="upload__title">Eliminar fotos</h2>
+        <div id="deleteAlbumGrid" class="album-grid"></div>
+    </div>
+
+    <!-- Fotos de un album (eliminar) -->
+    <div id="deletePhotosView" class="upload__view" hidden>
+        <button type="button" class="upload__link" data-back-to="deleteAlbumListView">‹ Álbumes</button>
+        <h2 class="upload__title" id="deletePhotosTitle">Álbum</h2>
+
+        <label class="upload__label" for="deletePin">PIN</label>
+        <input class="upload__input" type="password" id="deletePin" inputmode="numeric" autocomplete="off">
+
+        <div id="deletePhotoGrid" class="photo-grid"></div>
+        <p id="deleteStatus" class="upload__status" role="status"></p>
+    </div>
 </section>
 
 <audio id="bgAudio" loop preload="none"></audio>

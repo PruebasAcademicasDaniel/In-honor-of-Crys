@@ -7,6 +7,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -54,21 +55,61 @@ public class MediaController {
     public Map<String, Object> getMedia() throws IOException {
         Map<String, Object> config = readLocalConfig();
 
-        List<Map<String, Object>> photos = new ArrayList<>();
-        photos.addAll(localPhotos(config));
-        photos.addAll(fetchUploadedPhotos());
+        List<Map<String, Object>> defaultPhotos = new ArrayList<>();
+        defaultPhotos.addAll(localPhotos(config));
+        defaultPhotos.addAll(fetchPhotosInFolder(UPLOAD_FOLDER));
+
+        List<Map<String, Object>> albums = new ArrayList<>();
+        albums.add(album(null, defaultPhotos));
+        for (String albumName : listAlbumNames()) {
+            albums.add(album(albumName, fetchPhotosInFolder(UPLOAD_FOLDER + "/" + albumName)));
+        }
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("cover", config.get("cover"));
-        response.put("photos", photos);
+        response.put("albums", albums);
         response.put("song", config.get("song"));
         return response;
+    }
+
+    @PostMapping(value = "/albums", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Map<String, Object>> createAlbum(
+            @RequestParam("name") String name,
+            @RequestParam("pin") String pin) {
+
+        if (cloudinary == null || uploadPin == null || uploadPin.isBlank()) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(error("La creacion de albumes no esta configurada todavia."));
+        }
+        if (!uploadPin.equals(pin)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(error("PIN incorrecto."));
+        }
+
+        String albumName;
+        try {
+            albumName = sanitizeAlbumName(name);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error(e.getMessage()));
+        }
+
+        try {
+            cloudinary.api().createFolder(UPLOAD_FOLDER + "/" + albumName, ObjectUtils.emptyMap());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(error("No se pudo crear el album. Intenta de nuevo."));
+        }
+
+        Map<String, Object> created = new LinkedHashMap<>();
+        created.put("name", albumName);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @PostMapping(value = "/photos", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> uploadPhoto(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "caption", required = false, defaultValue = "") String caption,
+            @RequestParam("album") String album,
             @RequestParam("pin") String pin) {
 
         if (cloudinary == null || uploadPin == null || uploadPin.isBlank()) {
@@ -79,6 +120,12 @@ public class MediaController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(error("PIN incorrecto."));
         }
+        String albumName;
+        try {
+            albumName = sanitizeAlbumName(album);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error(e.getMessage()));
+        }
         if (file.isEmpty() || file.getContentType() == null
                 || !ALLOWED_CONTENT_TYPES.contains(file.getContentType().toLowerCase())) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -87,7 +134,7 @@ public class MediaController {
 
         try {
             Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.asMap(
-                    "folder", UPLOAD_FOLDER,
+                    "folder", UPLOAD_FOLDER + "/" + albumName,
                     "context", "caption=" + encodeContextValue(caption)));
 
             Map<String, Object> photo = new LinkedHashMap<>();
@@ -98,6 +145,53 @@ public class MediaController {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .body(error("No se pudo subir la foto. Intenta de nuevo."));
         }
+    }
+
+    @DeleteMapping(value = "/photos", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Map<String, Object>> deletePhoto(
+            @RequestParam("publicId") String publicId,
+            @RequestParam("pin") String pin) {
+
+        if (cloudinary == null || uploadPin == null || uploadPin.isBlank()) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(error("La eliminacion de fotos no esta configurada todavia."));
+        }
+        if (!uploadPin.equals(pin)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(error("PIN incorrecto."));
+        }
+        if (publicId == null || !publicId.startsWith(UPLOAD_FOLDER + "/")) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error("Foto invalida."));
+        }
+
+        try {
+            cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
+            return ResponseEntity.ok(Map.of("deleted", true));
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(error("No se pudo borrar la foto. Intenta de nuevo."));
+        }
+    }
+
+    private Map<String, Object> album(String name, List<Map<String, Object>> photos) {
+        Map<String, Object> album = new LinkedHashMap<>();
+        album.put("name", name);
+        album.put("photos", photos);
+        return album;
+    }
+
+    private String sanitizeAlbumName(String raw) {
+        String trimmed = raw == null ? "" : raw.trim();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("Ponle un nombre al album.");
+        }
+        if (trimmed.length() > 60) {
+            throw new IllegalArgumentException("El nombre del album es muy largo.");
+        }
+        if (trimmed.contains("/") || trimmed.contains("\\")) {
+            throw new IllegalArgumentException("El nombre del album no puede tener / ni \\.");
+        }
+        return trimmed;
     }
 
     private Map<String, Object> error(String message) {
@@ -125,13 +219,13 @@ public class MediaController {
     }
 
     @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> fetchUploadedPhotos() {
+    private List<Map<String, Object>> fetchPhotosInFolder(String folder) {
         if (cloudinary == null) {
             return List.of();
         }
         try {
             Map<String, Object> result = cloudinary.search()
-                    .expression("folder:" + UPLOAD_FOLDER)
+                    .expression("folder=" + folder)
                     .sortBy("created_at", "asc")
                     .maxResults(100)
                     .withField("context")
@@ -148,6 +242,7 @@ public class MediaController {
                     Map<String, Object> photo = new LinkedHashMap<>();
                     photo.put("src", resource.get("secure_url"));
                     photo.put("caption", extractCaption((Map<String, Object>) resource));
+                    photo.put("publicId", resource.get("public_id"));
                     photos.add(photo);
                 }
             }
@@ -155,6 +250,30 @@ public class MediaController {
         } catch (Exception e) {
             // Si Cloudinary no responde, mostramos igual las fotos locales
             // en vez de romper la pagina.
+            return List.of();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> listAlbumNames() {
+        if (cloudinary == null) {
+            return List.of();
+        }
+        try {
+            Map<String, Object> result = cloudinary.api().subFolders(UPLOAD_FOLDER, ObjectUtils.emptyMap());
+            Object rawFolders = result.get("folders");
+            if (!(rawFolders instanceof List<?> folders)) {
+                return List.of();
+            }
+            List<String> names = new ArrayList<>();
+            for (Object item : folders) {
+                if (item instanceof Map<?, ?> folder && folder.get("name") instanceof String name) {
+                    names.add(name);
+                }
+            }
+            return names;
+        } catch (Exception e) {
+            // Carpeta love-page todavia no existe (sin fotos subidas) u otro error de Cloudinary.
             return List.of();
         }
     }
