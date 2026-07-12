@@ -19,6 +19,15 @@
 
 [hidden] { display: none !important; }
 
+.screen-enter { animation: screenIn 420ms cubic-bezier(.19,1,.22,1) both; }
+@keyframes screenIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen-enter { animation: none; }
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -489,8 +498,9 @@ body {
   background: rgba(243,236,223,0.05);
   color: var(--bone);
   cursor: pointer;
+  transition: transform 150ms ease, background 200ms ease;
 }
-.album-card:active { transform: scale(0.97); }
+.album-card:active { transform: scale(0.97); background: rgba(243,236,223,0.1); }
 
 .album-card__icon { color: var(--rust); }
 
@@ -526,7 +536,9 @@ body {
   border: none;
   padding: 0;
   cursor: pointer;
+  transition: transform 150ms ease;
 }
+.photo-card:active { transform: scale(0.95); }
 .photo-card img {
   width: 100%;
   height: 100%;

@@ -3,7 +3,10 @@
  * -------------------
  * Pantallas dentro de la misma carga:
  *  - #cover: portada con imagen, titulo y los dos botones de entrada.
- *  - #scene: vista tipo libro (una foto a la vez, agrupada por album).
+ *  - #photosScreen: "Ver nuestras fotos" -> lista de albumes (incluye un
+ *    boton de Vista libro que recorre todo en orden).
+ *  - #scene: visor tipo libro (swipe/tap), reutilizado tanto para un
+ *    album individual como para la Vista libro completa.
  *  - #uploadScreen: "Configuracion" -> Subir fotos (crear album + subir
  *    dentro de un album) y Eliminar fotos (navegar albumes y borrar).
  *
@@ -11,11 +14,14 @@
  * lista de fotos). El album sin nombre agrupa las fotos "de base" del
  * repo (media-config.json) y las fotos sueltas subidas antes de que
  * existieran los albumes; esas no se pueden borrar ni se ofrecen como
- * destino de subida, solo se ven en el libro.
+ * destino de subida, pero si se pueden ver (como album "Fotos").
  */
 (function () {
   const PIN_STORAGE_KEY = 'lovePagePin';
   const SWIPE_THRESHOLD_PX = 40;
+  const DEFAULT_ALBUM_NAME = 'Fotos';
+  const EMPTY_ALBUMS_MSG = 'Todavia no hay fotos. Ve a Configuración para crear un álbum y subir la primera.';
+  const EMPTY_ALBUM_PHOTOS_MSG = 'Este álbum todavia no tiene fotos.';
 
   const HEART_CARD_SVG = `
     <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6">
@@ -37,6 +43,10 @@
   const coverTitle = document.getElementById('coverTitle');
   const viewPhotosBtn = document.getElementById('viewPhotosBtn');
   const settingsBtn = document.getElementById('settingsBtn');
+
+  const photosScreen = document.getElementById('photosScreen');
+  const photosAlbumGrid = document.getElementById('photosAlbumGrid');
+  const viewBookBtn = document.getElementById('viewBookBtn');
 
   const scene = document.getElementById('scene');
   const soundToggle = document.getElementById('soundToggle');
@@ -75,15 +85,15 @@
   const deletePhotoGrid = document.getElementById('deletePhotoGrid');
   const deleteStatus = document.getElementById('deleteStatus');
 
+  const SCREENS = [coverScreen, photosScreen, scene, uploadScreen];
+
   const CONFIG_VIEWS = [
     settingsMenuView, albumListView, createAlbumView, uploadPhotoView,
     deleteAlbumListView, deletePhotosView,
   ];
 
   let mediaData = { cover: null, albums: [], song: null };
-  let currentSlideData = [];
   let currentAlbumName = null;
-  let slidesBuilt = false;
   let audioReady = false;
   let current = 0;
   let total = 0;
@@ -114,6 +124,14 @@
     return mediaData.albums.filter((album) => album.name);
   }
 
+  function visibleAlbums() {
+    return mediaData.albums.filter((album) => album.photos.length > 0);
+  }
+
+  function albumDisplayName(album) {
+    return album.name || DEFAULT_ALBUM_NAME;
+  }
+
   function renderCover() {
     loader.remove();
     if (mediaData.cover && mediaData.cover.src) {
@@ -137,21 +155,23 @@
   // Navegacion entre pantallas
   // ---------------------------------------------------------------
   function showScreen(target) {
-    [coverScreen, scene, uploadScreen].forEach((el) => {
+    SCREENS.forEach((el) => {
       el.hidden = el !== target;
     });
+    target.classList.remove('screen-enter');
+    // eslint-disable-next-line no-unused-expressions
+    void target.offsetWidth;
+    target.classList.add('screen-enter');
   }
 
   function showConfigView(target) {
     CONFIG_VIEWS.forEach((el) => {
       el.hidden = el !== target;
     });
+    target.classList.remove('screen-enter');
+    void target.offsetWidth;
+    target.classList.add('screen-enter');
   }
-
-  viewPhotosBtn.addEventListener('click', () => {
-    ensureSlidesBuilt();
-    showScreen(scene);
-  });
 
   settingsBtn.addEventListener('click', () => {
     showConfigView(settingsMenuView);
@@ -159,7 +179,8 @@
   });
 
   document.querySelectorAll('[data-back]').forEach((btn) => {
-    btn.addEventListener('click', () => showScreen(coverScreen));
+    const targetId = btn.dataset.back || 'cover';
+    btn.addEventListener('click', () => showScreen(document.getElementById(targetId)));
   });
 
   document.querySelectorAll('[data-back-to]').forEach((btn) => {
@@ -167,6 +188,33 @@
       showConfigView(document.getElementById(btn.dataset.backTo));
     });
   });
+
+  // ---------------------------------------------------------------
+  // Ver nuestras fotos: lista de albumes + vista libro
+  // ---------------------------------------------------------------
+  viewPhotosBtn.addEventListener('click', () => {
+    renderPhotosAlbumGrid();
+    showScreen(photosScreen);
+  });
+
+  viewBookBtn.addEventListener('click', () => {
+    openScene(buildBookSlides(), EMPTY_ALBUMS_MSG);
+  });
+
+  function renderPhotosAlbumGrid() {
+    photosAlbumGrid.innerHTML = '';
+    const albums = visibleAlbums();
+    if (albums.length === 0) {
+      photosAlbumGrid.appendChild(emptyHint(EMPTY_ALBUMS_MSG));
+      return;
+    }
+    albums.forEach((album) => {
+      const card = buildAlbumCard({ name: albumDisplayName(album), photos: album.photos }, () => {
+        openScene(buildAlbumSlides(album), EMPTY_ALBUM_PHOTOS_MSG);
+      });
+      photosAlbumGrid.appendChild(card);
+    });
+  }
 
   // ---------------------------------------------------------------
   // Menu de configuracion
@@ -263,7 +311,6 @@
       })
       .then((data) => {
         applyMediaData(data);
-        slidesBuilt = false;
         renderAlbumGrid();
         showConfigView(albumListView);
       })
@@ -301,17 +348,18 @@
     formData.append('caption', caption);
     formData.append('album', currentAlbumName);
 
-    const targetAlbum = currentAlbumName;
-
     fetch('/api/photos', { method: 'POST', body: formData })
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error || 'No se pudo subir la foto.');
         sessionStorage.setItem(PIN_STORAGE_KEY, pin);
-        uploadStatus.textContent = '¡Lista! Ya se agrego a la galeria.';
+        uploadStatus.textContent = '¡Lista! Ya se agrego al album.';
         uploadPhotoView.reset();
         uploadPinInput.value = pin;
-        refreshMediaAndShowGallery(targetAlbum);
+        return fetch('/api/media').then((r) => r.json());
+      })
+      .then((data) => {
+        if (data) applyMediaData(data);
       })
       .catch((err) => {
         uploadStatus.textContent = err.message;
@@ -345,7 +393,7 @@
   function renderDeletePhotoGrid(album) {
     deletePhotoGrid.innerHTML = '';
     if (album.photos.length === 0) {
-      deletePhotoGrid.appendChild(emptyHint('Este album todavia no tiene fotos.'));
+      deletePhotoGrid.appendChild(emptyHint(EMPTY_ALBUM_PHOTOS_MSG));
       return;
     }
     album.photos.forEach((photo) => {
@@ -380,7 +428,6 @@
         cardEl.remove();
         album.photos = album.photos.filter((p) => p.publicId !== photo.publicId);
         deleteStatus.textContent = 'Foto borrada.';
-        slidesBuilt = false;
         return fetch('/api/media').then((r) => r.json());
       })
       .then((data) => {
@@ -392,41 +439,44 @@
   }
 
   // ---------------------------------------------------------------
-  // Vista libro
+  // Visor de fotos (album individual o vista libro completa)
   // ---------------------------------------------------------------
-  function buildSlideData() {
+  function buildBookSlides() {
     const slides = [];
-    mediaData.albums.forEach((album) => {
-      if (album.photos.length === 0) return;
+    visibleAlbums().forEach((album) => {
       if (album.name) {
         slides.push({ type: 'divider', name: album.name });
       }
       album.photos.forEach((photo) => {
-        slides.push({ type: 'photo', src: photo.src, caption: photo.caption, album: album.name });
+        slides.push({ type: 'photo', src: photo.src, caption: photo.caption });
       });
     });
     return slides;
   }
 
-  function ensureSlidesBuilt() {
-    if (slidesBuilt) return;
-    scene.querySelectorAll('.scene__empty').forEach((el) => el.remove());
+  function buildAlbumSlides(album) {
+    return album.photos.map((photo) => ({ type: 'photo', src: photo.src, caption: photo.caption }));
+  }
 
-    currentSlideData = buildSlideData();
-    if (currentSlideData.length === 0) {
+  function openScene(slideData, emptyMessage) {
+    scene.querySelectorAll('.scene__empty, .slide, .dots').forEach((el) => el.remove());
+
+    if (slideData.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'scene__empty';
-      empty.textContent = 'Todavia no hay fotos. ¡Subi la primera!';
+      empty.textContent = emptyMessage;
       scene.appendChild(empty);
+      total = 0;
+      prevBtn.hidden = true;
+      nextBtn.hidden = true;
     } else {
-      buildSlides(currentSlideData);
+      buildSlides(slideData);
       if (mediaData.song && mediaData.song.src) setupAudio(mediaData.song.src);
     }
-    slidesBuilt = true;
+    showScreen(scene);
   }
 
   function buildSlides(slides) {
-    scene.querySelectorAll('.slide, .dots').forEach((el) => el.remove());
     current = 0;
     total = slides.length;
 
@@ -569,26 +619,5 @@
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
-  }
-
-  function refreshMediaAndShowGallery(targetAlbum) {
-    fetch('/api/media')
-      .then((res) => res.json())
-      .then((data) => {
-        applyMediaData(data);
-        slidesBuilt = false;
-        ensureSlidesBuilt();
-
-        let targetIndex = currentSlideData.length - 1;
-        for (let i = currentSlideData.length - 1; i >= 0; i -= 1) {
-          if (currentSlideData[i].type === 'photo' && currentSlideData[i].album === targetAlbum) {
-            targetIndex = i;
-            break;
-          }
-        }
-        goTo(targetIndex);
-        showScreen(scene);
-      })
-      .catch(() => {});
   }
 })();
