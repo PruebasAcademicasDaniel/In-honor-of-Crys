@@ -1,15 +1,18 @@
 # love-page
 
-Página web con una foto a pantalla completa y un mensaje, pensada para
-abrirse escaneando un código QR desde cualquier celular (Android, iPhone
-o Google Lens).
+Página web con una portada ("Our Story"), una foto a pantalla completa y un
+mensaje, pensada para abrirse escaneando un código QR desde cualquier
+celular (Android, iPhone o Google Lens). Desde la portada se puede entrar a
+ver las fotos en formato libro (una por una) o subir fotos nuevas
+directamente desde el celular, sin pasar por el IDE.
 
 ## Stack
 
 - **Backend:** Java 21 + Spring Boot 3.3 (Maven)
 - **Frontend:** HTML/CSS/JS servido como recursos estáticos
-- **Contenido:** editable vía `src/main/resources/static/media-config.json`
-  (sin tocar código)
+- **Contenido de base:** editable vía `src/main/resources/static/media-config.json`
+  (sin tocar código); las fotos que se suben desde la propia web se guardan
+  en **Cloudinary** (para que sobrevivan a los redeploys de Render)
 - **Despliegue:** Docker → Render
 
 ## Estructura
@@ -33,26 +36,61 @@ love-page/
         └── audio/              ← aquí van canciones (mp3)
 ```
 
-## Cómo agregar más fotos o una canción (a futuro)
+## Cómo agregar fotos
+
+**Desde el celular (recomendado):** en la portada, tocar "Subir fotos",
+poner el PIN (ver variable `UPLOAD_PIN` abajo), elegir la imagen y una
+frase opcional. Queda guardada en Cloudinary y aparece al toque en la
+vista de fotos, sin redeploy.
+
+**A mano (para las fotos "de base" del repo):**
 
 1. Sube la imagen a `src/main/resources/static/img/` (ej: `photo-2.png`)
 2. Edita `media-config.json`:
 
 ```json
 {
+  "cover": { "src": "/img/photo-3.jpeg", "title": "Our Story" },
   "photos": [
-    { "src": "/img/photo-1.png", "caption": "Eres todo lo que quiero cuando no buscaba nada." },
-    { "src": "/img/photo-2.png", "caption": "Otro momento que quiero recordar." }
+    { "src": "/img/photo-2.jpeg", "caption": "Eres todo lo que quiero cuando no buscaba nada." },
+    { "src": "/img/photo-3.jpeg", "caption": "Otro momento que quiero recordar." }
   ],
   "song": { "src": "/audio/song.mp3" }
 }
 ```
 
+`cover.src` puede ser cualquier imagen de `static/img/` — usa una que se vea
+bien de fondo completo (foto derecha, no un recorte tipo story con texto o
+iconos ya incluidos en la imagen).
+
 3. Vuelve a subir los cambios a GitHub → Render despliega automáticamente
 
-El frontend ya soporta varias fotos (rotan solas cada 6s con puntos
-indicadores arriba) y un botón de sonido que aparece solo si hay canción
-configurada. No hace falta tocar `app.js` ni `index.html`.
+El frontend soporta cualquier cantidad de fotos (vista tipo libro, se pasan
+tocando la mitad de la pantalla, con las flechas, o con swipe) y un botón
+de sonido que aparece solo si hay canción configurada. No hace falta tocar
+`app.js` ni `index.html`.
+
+## Variables de entorno (subida de fotos desde la web)
+
+Para que el botón "Subir fotos" funcione hacen falta estas variables de
+entorno (si no están configuradas, la página funciona igual con las fotos
+de `media-config.json`, pero el botón de subir muestra un aviso):
+
+| Variable         | Para qué sirve                                                        |
+|------------------|------------------------------------------------------------------------|
+| `CLOUDINARY_URL` | Credenciales de Cloudinary, formato `cloudinary://API_KEY:API_SECRET@CLOUD_NAME` |
+| `UPLOAD_PIN`     | PIN que se pide antes de subir una foto (la página es pública, se comparte por QR) |
+
+**Cómo conseguir `CLOUDINARY_URL`:**
+
+1. Crea una cuenta gratis en https://cloudinary.com
+2. En el Dashboard, copia el valor "API Environment variable" (ya viene
+   armado como `CLOUDINARY_URL=cloudinary://...`)
+3. En Render: el servicio → **Environment** → agrega `CLOUDINARY_URL` y
+   `UPLOAD_PIN` (elegí cualquier PIN, ej. `2468`)
+4. Redeploy (Render lo hace solo al guardar las env vars)
+
+Para probar local, exporta las mismas variables antes de `mvn spring-boot:run`.
 
 ## Probar en tu computadora (opcional)
 

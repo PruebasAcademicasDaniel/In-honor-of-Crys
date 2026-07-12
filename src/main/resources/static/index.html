@@ -12,24 +12,70 @@
 </head>
 <body>
 
-<main id="scene" class="scene" aria-live="polite">
-    <div class="loader" id="loader">
-        <span></span>
+<div id="loader" class="loader"><span></span></div>
+
+<!-- ---------- Portada ---------- -->
+<section id="cover" class="cover" hidden>
+    <img id="coverImg" class="cover__img" alt="">
+    <div class="cover__scrim"></div>
+    <h1 id="coverTitle" class="cover__title">Our Story</h1>
+    <div class="cover__actions">
+        <button id="viewPhotosBtn" class="cover__btn cover__btn--primary" type="button">Ver nuestras fotos</button>
+        <button id="uploadPhotosBtn" class="cover__btn" type="button">Subir fotos</button>
     </div>
+</section>
+
+<!-- ---------- Vista libro ---------- -->
+<main id="scene" class="scene" aria-live="polite" hidden>
+    <button class="back-btn" data-back aria-label="Volver a la portada">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M15 6l-6 6 6 6"/>
+        </svg>
+    </button>
+
+    <button id="soundToggle" class="sound-toggle" hidden aria-label="Reproducir musica">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6">
+            <path d="M4 9v6h4l5 5V4L8 9H4z"/>
+            <path id="waveIcon" d="M16.5 8.5a5 5 0 0 1 0 7"/>
+        </svg>
+    </button>
+
+    <button id="prevBtn" class="page-btn page-btn--prev" hidden aria-label="Foto anterior">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M15 6l-6 6 6 6"/>
+        </svg>
+    </button>
+    <button id="nextBtn" class="page-btn page-btn--next" hidden aria-label="Ver siguiente foto">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M9 6l6 6-6 6"/>
+        </svg>
+    </button>
 </main>
 
-<button id="soundToggle" class="sound-toggle" hidden aria-label="Reproducir musica">
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6">
-        <path d="M4 9v6h4l5 5V4L8 9H4z"/>
-        <path id="waveIcon" d="M16.5 8.5a5 5 0 0 1 0 7"/>
-    </svg>
-</button>
+<!-- ---------- Subir fotos ---------- -->
+<section id="uploadScreen" class="upload" hidden>
+    <button class="back-btn" data-back aria-label="Volver a la portada">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M15 6l-6 6 6 6"/>
+        </svg>
+    </button>
 
-<button id="nextBtn" class="next-btn" hidden aria-label="Ver siguiente foto">
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8">
-        <path d="M9 6l6 6-6 6"/>
-    </svg>
-</button>
+    <form id="uploadForm" class="upload__form">
+        <h2 class="upload__title">Sumar una foto</h2>
+
+        <label class="upload__label" for="uploadPin">PIN</label>
+        <input class="upload__input" type="password" id="uploadPin" name="pin" inputmode="numeric" autocomplete="off" required>
+
+        <label class="upload__label" for="uploadFile">Foto</label>
+        <input class="upload__input" type="file" id="uploadFile" name="file" accept="image/*" capture="environment" required>
+
+        <label class="upload__label" for="uploadCaption">Frase (opcional)</label>
+        <input class="upload__input" type="text" id="uploadCaption" name="caption" maxlength="200">
+
+        <button class="upload__submit" type="submit">Subir foto</button>
+        <p id="uploadStatus" class="upload__status" role="status"></p>
+    </form>
+</section>
 
 <audio id="bgAudio" loop preload="none"></audio>
 

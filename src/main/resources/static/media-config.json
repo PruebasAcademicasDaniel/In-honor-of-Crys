@@ -1,4 +1,8 @@
 {
+  "cover": {
+    "src": "/img/photo-3.jpeg",
+    "title": "Our Story"
+  },
   "photos": [
     {
       "src": "/img/photo-2.jpeg",
