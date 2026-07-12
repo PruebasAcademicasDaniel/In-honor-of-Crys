@@ -161,10 +161,14 @@ public class MediaController {
 
     @SuppressWarnings("unchecked")
     private String extractCaption(Map<String, Object> resource) {
-        if (resource.get("context") instanceof Map<?, ?> context
-                && context.get("custom") instanceof Map<?, ?> custom
-                && custom.get("caption") instanceof String caption) {
-            return caption;
+        if (resource.get("context") instanceof Map<?, ?> context) {
+            if (context.get("custom") instanceof Map<?, ?> custom
+                    && custom.get("caption") instanceof String caption) {
+                return caption;
+            }
+            if (context.get("caption") instanceof String caption) {
+                return caption;
+            }
         }
         return "";
     }
