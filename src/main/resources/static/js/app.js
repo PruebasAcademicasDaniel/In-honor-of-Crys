@@ -1,17 +1,34 @@
 /**
  * Pagina "Our Story"
  * -------------------
- * Tres pantallas dentro de la misma carga:
+ * Pantallas dentro de la misma carga:
  *  - #cover: portada con imagen, titulo y los dos botones de entrada.
- *  - #scene: vista tipo libro (una foto a la vez, se pagina a mano).
- *  - #uploadScreen: formulario para sumar una foto nueva (PIN + archivo).
+ *  - #scene: vista tipo libro (una foto a la vez, agrupada por album).
+ *  - #uploadScreen: "Configuracion" -> Subir fotos (crear album + subir
+ *    dentro de un album) y Eliminar fotos (navegar albumes y borrar).
  *
- * /api/media trae la portada, las fotos "de base" y las que se hayan
- * subido desde el propio formulario (esas viven en Cloudinary).
+ * /api/media trae la portada, la cancion y los albumes (cada uno con su
+ * lista de fotos). El album sin nombre agrupa las fotos "de base" del
+ * repo (media-config.json) y las fotos sueltas subidas antes de que
+ * existieran los albumes; esas no se pueden borrar ni se ofrecen como
+ * destino de subida, solo se ven en el libro.
  */
 (function () {
   const PIN_STORAGE_KEY = 'lovePagePin';
   const SWIPE_THRESHOLD_PX = 40;
+
+  const HEART_CARD_SVG = `
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6">
+      <rect x="4" y="3" width="16" height="18" rx="2"></rect>
+      <path d="M12 16.3c-2.7-1.9-4.3-3.4-4.3-5.1a2.3 2.3 0 0 1 4.3-1.4 2.3 2.3 0 0 1 4.3 1.4c0 1.7-1.6 3.2-4.3 5.1z" fill="currentColor" stroke="none"></path>
+    </svg>`;
+
+  const TRASH_SVG = `
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M4 7h16"></path>
+      <path d="M9 7V4h6v3"></path>
+      <path d="M6 7l1 13h10l1-13"></path>
+    </svg>`;
 
   const loader = document.getElementById('loader');
 
@@ -19,7 +36,7 @@
   const coverImg = document.getElementById('coverImg');
   const coverTitle = document.getElementById('coverTitle');
   const viewPhotosBtn = document.getElementById('viewPhotosBtn');
-  const uploadPhotosBtn = document.getElementById('uploadPhotosBtn');
+  const settingsBtn = document.getElementById('settingsBtn');
 
   const scene = document.getElementById('scene');
   const soundToggle = document.getElementById('soundToggle');
@@ -28,13 +45,44 @@
   const nextBtn = document.getElementById('nextBtn');
 
   const uploadScreen = document.getElementById('uploadScreen');
-  const uploadForm = document.getElementById('uploadForm');
+
+  const settingsMenuView = document.getElementById('settingsMenuView');
+  const goUploadBtn = document.getElementById('goUploadBtn');
+  const goDeleteBtn = document.getElementById('goDeleteBtn');
+
+  const albumListView = document.getElementById('albumListView');
+  const createAlbumBtn = document.getElementById('createAlbumBtn');
+  const albumGrid = document.getElementById('albumGrid');
+
+  const createAlbumView = document.getElementById('createAlbumForm');
+  const albumNameInput = document.getElementById('albumName');
+  const albumPinInput = document.getElementById('albumPin');
+  const createAlbumStatus = document.getElementById('createAlbumStatus');
+
+  const uploadPhotoView = document.getElementById('uploadForm');
   const uploadStatus = document.getElementById('uploadStatus');
   const uploadPinInput = document.getElementById('uploadPin');
   const uploadFileInput = document.getElementById('uploadFile');
   const uploadCaptionInput = document.getElementById('uploadCaption');
+  const uploadAlbumLabel = document.getElementById('uploadAlbumLabel');
 
-  let mediaData = { cover: null, photos: [], song: null };
+  const deleteAlbumListView = document.getElementById('deleteAlbumListView');
+  const deleteAlbumGrid = document.getElementById('deleteAlbumGrid');
+
+  const deletePhotosView = document.getElementById('deletePhotosView');
+  const deletePhotosTitle = document.getElementById('deletePhotosTitle');
+  const deletePinInput = document.getElementById('deletePin');
+  const deletePhotoGrid = document.getElementById('deletePhotoGrid');
+  const deleteStatus = document.getElementById('deleteStatus');
+
+  const CONFIG_VIEWS = [
+    settingsMenuView, albumListView, createAlbumView, uploadPhotoView,
+    deleteAlbumListView, deletePhotosView,
+  ];
+
+  let mediaData = { cover: null, albums: [], song: null };
+  let currentSlideData = [];
+  let currentAlbumName = null;
   let slidesBuilt = false;
   let audioReady = false;
   let current = 0;
@@ -57,9 +105,13 @@
   function applyMediaData(data) {
     mediaData = {
       cover: data.cover || mediaData.cover,
-      photos: Array.isArray(data.photos) ? data.photos : [],
+      albums: Array.isArray(data.albums) ? data.albums : [],
       song: data.song || mediaData.song,
     };
+  }
+
+  function namedAlbums() {
+    return mediaData.albums.filter((album) => album.name);
   }
 
   function renderCover() {
@@ -68,10 +120,6 @@
       coverImg.src = mediaData.cover.src;
     }
     coverTitle.textContent = (mediaData.cover && mediaData.cover.title) || 'Our Story';
-
-    const storedPin = sessionStorage.getItem(PIN_STORAGE_KEY);
-    if (storedPin) uploadPinInput.value = storedPin;
-
     showScreen(coverScreen);
   }
 
@@ -94,13 +142,19 @@
     });
   }
 
+  function showConfigView(target) {
+    CONFIG_VIEWS.forEach((el) => {
+      el.hidden = el !== target;
+    });
+  }
+
   viewPhotosBtn.addEventListener('click', () => {
     ensureSlidesBuilt();
     showScreen(scene);
   });
 
-  uploadPhotosBtn.addEventListener('click', () => {
-    uploadStatus.textContent = '';
+  settingsBtn.addEventListener('click', () => {
+    showConfigView(settingsMenuView);
     showScreen(uploadScreen);
   });
 
@@ -108,54 +162,309 @@
     btn.addEventListener('click', () => showScreen(coverScreen));
   });
 
+  document.querySelectorAll('[data-back-to]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      showConfigView(document.getElementById(btn.dataset.backTo));
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // Menu de configuracion
+  // ---------------------------------------------------------------
+  goUploadBtn.addEventListener('click', () => {
+    renderAlbumGrid();
+    showConfigView(albumListView);
+  });
+
+  goDeleteBtn.addEventListener('click', () => {
+    renderDeleteAlbumGrid();
+    showConfigView(deleteAlbumListView);
+  });
+
+  function buildAlbumCard(album, onClick) {
+    const card = document.createElement('button');
+    card.className = 'album-card';
+    card.type = 'button';
+    const count = album.photos.length;
+    card.innerHTML = `
+      <span class="album-card__icon">${HEART_CARD_SVG}</span>
+      <span class="album-card__name">${escapeHtml(album.name)}</span>
+      <span class="album-card__count">${count} foto${count === 1 ? '' : 's'}</span>
+    `;
+    card.addEventListener('click', onClick);
+    return card;
+  }
+
+  function emptyHint(text) {
+    const p = document.createElement('p');
+    p.className = 'upload__status';
+    p.textContent = text;
+    return p;
+  }
+
+  function prefillPin(input) {
+    const storedPin = sessionStorage.getItem(PIN_STORAGE_KEY);
+    if (storedPin) input.value = storedPin;
+  }
+
+  // ---------------------------------------------------------------
+  // Subir fotos: lista de albumes + crear album + subir foto
+  // ---------------------------------------------------------------
+  function renderAlbumGrid() {
+    albumGrid.innerHTML = '';
+    const albums = namedAlbums();
+    if (albums.length === 0) {
+      albumGrid.appendChild(emptyHint('Todavia no hay albumes. ¡Crea el primero!'));
+      return;
+    }
+    albums.forEach((album) => {
+      albumGrid.appendChild(buildAlbumCard(album, () => {
+        currentAlbumName = album.name;
+        uploadStatus.textContent = '';
+        uploadAlbumLabel.textContent = `Álbum: ${album.name}`;
+        prefillPin(uploadPinInput);
+        showConfigView(uploadPhotoView);
+      }));
+    });
+  }
+
+  createAlbumBtn.addEventListener('click', () => {
+    createAlbumStatus.textContent = '';
+    createAlbumView.reset();
+    prefillPin(albumPinInput);
+    showConfigView(createAlbumView);
+  });
+
+  createAlbumView.addEventListener('submit', (event) => {
+    event.preventDefault();
+
+    const name = albumNameInput.value.trim();
+    const pin = albumPinInput.value.trim();
+
+    if (!name) {
+      createAlbumStatus.textContent = 'Ponle un nombre al album.';
+      return;
+    }
+
+    const submitBtn = createAlbumView.querySelector('.upload__submit');
+    submitBtn.disabled = true;
+    createAlbumStatus.textContent = 'Creando...';
+
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('pin', pin);
+
+    fetch('/api/albums', { method: 'POST', body: formData })
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || 'No se pudo crear el album.');
+        sessionStorage.setItem(PIN_STORAGE_KEY, pin);
+        return fetch('/api/media').then((r) => r.json());
+      })
+      .then((data) => {
+        applyMediaData(data);
+        slidesBuilt = false;
+        renderAlbumGrid();
+        showConfigView(albumListView);
+      })
+      .catch((err) => {
+        createAlbumStatus.textContent = err.message;
+      })
+      .finally(() => {
+        submitBtn.disabled = false;
+      });
+  });
+
+  uploadPhotoView.addEventListener('submit', (event) => {
+    event.preventDefault();
+
+    const pin = uploadPinInput.value.trim();
+    const file = uploadFileInput.files[0];
+    const caption = uploadCaptionInput.value.trim();
+
+    if (!file) {
+      uploadStatus.textContent = 'Elegi una foto primero.';
+      return;
+    }
+    if (!currentAlbumName) {
+      uploadStatus.textContent = 'Elegi un album primero.';
+      return;
+    }
+
+    const submitBtn = uploadPhotoView.querySelector('.upload__submit');
+    submitBtn.disabled = true;
+    uploadStatus.textContent = 'Subiendo...';
+
+    const formData = new FormData();
+    formData.append('pin', pin);
+    formData.append('file', file);
+    formData.append('caption', caption);
+    formData.append('album', currentAlbumName);
+
+    const targetAlbum = currentAlbumName;
+
+    fetch('/api/photos', { method: 'POST', body: formData })
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || 'No se pudo subir la foto.');
+        sessionStorage.setItem(PIN_STORAGE_KEY, pin);
+        uploadStatus.textContent = '¡Lista! Ya se agrego a la galeria.';
+        uploadPhotoView.reset();
+        uploadPinInput.value = pin;
+        refreshMediaAndShowGallery(targetAlbum);
+      })
+      .catch((err) => {
+        uploadStatus.textContent = err.message;
+      })
+      .finally(() => {
+        submitBtn.disabled = false;
+      });
+  });
+
+  // ---------------------------------------------------------------
+  // Eliminar fotos: lista de albumes + fotos del album
+  // ---------------------------------------------------------------
+  function renderDeleteAlbumGrid() {
+    deleteAlbumGrid.innerHTML = '';
+    const albums = namedAlbums();
+    if (albums.length === 0) {
+      deleteAlbumGrid.appendChild(emptyHint('Todavia no hay albumes con fotos.'));
+      return;
+    }
+    albums.forEach((album) => {
+      deleteAlbumGrid.appendChild(buildAlbumCard(album, () => {
+        deletePhotosTitle.textContent = album.name;
+        deleteStatus.textContent = '';
+        prefillPin(deletePinInput);
+        renderDeletePhotoGrid(album);
+        showConfigView(deletePhotosView);
+      }));
+    });
+  }
+
+  function renderDeletePhotoGrid(album) {
+    deletePhotoGrid.innerHTML = '';
+    if (album.photos.length === 0) {
+      deletePhotoGrid.appendChild(emptyHint('Este album todavia no tiene fotos.'));
+      return;
+    }
+    album.photos.forEach((photo) => {
+      const card = document.createElement('button');
+      card.className = 'photo-card';
+      card.type = 'button';
+      card.innerHTML = `
+        <img src="${photo.src}" alt="${escapeHtml(photo.caption || '')}">
+        <span class="photo-card__delete">${TRASH_SVG}</span>
+      `;
+      card.addEventListener('click', () => confirmDeletePhoto(photo, card, album));
+      deletePhotoGrid.appendChild(card);
+    });
+  }
+
+  function confirmDeletePhoto(photo, cardEl, album) {
+    const pin = deletePinInput.value.trim();
+    if (!pin) {
+      deleteStatus.textContent = 'Ingresa el PIN primero.';
+      return;
+    }
+    if (!window.confirm('¿Borrar esta foto? No se puede deshacer.')) return;
+
+    deleteStatus.textContent = 'Borrando...';
+    const params = new URLSearchParams({ publicId: photo.publicId, pin });
+
+    fetch(`/api/photos?${params.toString()}`, { method: 'DELETE' })
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || 'No se pudo borrar la foto.');
+        sessionStorage.setItem(PIN_STORAGE_KEY, pin);
+        cardEl.remove();
+        album.photos = album.photos.filter((p) => p.publicId !== photo.publicId);
+        deleteStatus.textContent = 'Foto borrada.';
+        slidesBuilt = false;
+        return fetch('/api/media').then((r) => r.json());
+      })
+      .then((data) => {
+        if (data) applyMediaData(data);
+      })
+      .catch((err) => {
+        deleteStatus.textContent = err.message;
+      });
+  }
+
   // ---------------------------------------------------------------
   // Vista libro
   // ---------------------------------------------------------------
+  function buildSlideData() {
+    const slides = [];
+    mediaData.albums.forEach((album) => {
+      if (album.photos.length === 0) return;
+      if (album.name) {
+        slides.push({ type: 'divider', name: album.name });
+      }
+      album.photos.forEach((photo) => {
+        slides.push({ type: 'photo', src: photo.src, caption: photo.caption, album: album.name });
+      });
+    });
+    return slides;
+  }
+
   function ensureSlidesBuilt() {
     if (slidesBuilt) return;
     scene.querySelectorAll('.scene__empty').forEach((el) => el.remove());
 
-    if (mediaData.photos.length === 0) {
+    currentSlideData = buildSlideData();
+    if (currentSlideData.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'scene__empty';
       empty.textContent = 'Todavia no hay fotos. ¡Subi la primera!';
       scene.appendChild(empty);
     } else {
-      buildSlides(mediaData.photos);
+      buildSlides(currentSlideData);
       if (mediaData.song && mediaData.song.src) setupAudio(mediaData.song.src);
     }
     slidesBuilt = true;
   }
 
-  function buildSlides(photos) {
+  function buildSlides(slides) {
     scene.querySelectorAll('.slide, .dots').forEach((el) => el.remove());
     current = 0;
-    total = photos.length;
+    total = slides.length;
 
-    photos.forEach((photo, index) => {
+    slides.forEach((data, index) => {
       const slide = document.createElement('div');
-      slide.className = 'slide';
       slide.dataset.index = String(index);
 
-      const img = document.createElement('img');
-      img.className = 'slide__img';
-      img.src = photo.src;
-      img.alt = photo.caption || 'Foto';
-
-      const scrim = document.createElement('div');
-      scrim.className = 'slide__scrim';
-
-      slide.appendChild(img);
-      slide.appendChild(scrim);
-
-      if (photo.caption && photo.caption.trim() !== '') {
-        const caption = document.createElement('div');
-        caption.className = 'caption';
-        caption.innerHTML = `
-          <div class="caption__mark"></div>
-          <p class="caption__text">${escapeHtml(photo.caption)}</p>
+      if (data.type === 'divider') {
+        slide.className = 'slide slide--divider';
+        slide.innerHTML = `
+          <div class="divider">
+            <span class="divider__icon">${HEART_CARD_SVG}</span>
+            <h3 class="divider__title">${escapeHtml(data.name)}</h3>
+          </div>
         `;
-        slide.appendChild(caption);
+      } else {
+        slide.className = 'slide';
+
+        const img = document.createElement('img');
+        img.className = 'slide__img';
+        img.src = data.src;
+        img.alt = data.caption || 'Foto';
+
+        const scrim = document.createElement('div');
+        scrim.className = 'slide__scrim';
+
+        slide.appendChild(img);
+        slide.appendChild(scrim);
+
+        if (data.caption && data.caption.trim() !== '') {
+          const caption = document.createElement('div');
+          caption.className = 'caption';
+          caption.innerHTML = `
+            <div class="caption__mark"></div>
+            <p class="caption__text">${escapeHtml(data.caption)}</p>
+          `;
+          slide.appendChild(caption);
+        }
       }
 
       scene.appendChild(slide);
@@ -165,7 +474,7 @@
     if (total > 1) {
       dotsEl = document.createElement('div');
       dotsEl.className = 'dots';
-      photos.forEach(() => dotsEl.appendChild(document.createElement('span')));
+      slides.forEach(() => dotsEl.appendChild(document.createElement('span')));
       scene.appendChild(dotsEl);
     }
 
@@ -262,56 +571,22 @@
     return div.innerHTML;
   }
 
-  // ---------------------------------------------------------------
-  // Subir foto
-  // ---------------------------------------------------------------
-  uploadForm.addEventListener('submit', (event) => {
-    event.preventDefault();
-
-    const pin = uploadPinInput.value.trim();
-    const file = uploadFileInput.files[0];
-    const caption = uploadCaptionInput.value.trim();
-
-    if (!file) {
-      uploadStatus.textContent = 'Elegi una foto primero.';
-      return;
-    }
-
-    const submitBtn = uploadForm.querySelector('.upload__submit');
-    submitBtn.disabled = true;
-    uploadStatus.textContent = 'Subiendo...';
-
-    const formData = new FormData();
-    formData.append('pin', pin);
-    formData.append('file', file);
-    formData.append('caption', caption);
-
-    fetch('/api/photos', { method: 'POST', body: formData })
-      .then(async (res) => {
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(body.error || 'No se pudo subir la foto.');
-        sessionStorage.setItem(PIN_STORAGE_KEY, pin);
-        uploadStatus.textContent = '¡Lista! Ya se agrego a la galeria.';
-        uploadForm.reset();
-        uploadPinInput.value = pin;
-        refreshMediaAndShowGallery();
-      })
-      .catch((err) => {
-        uploadStatus.textContent = err.message;
-      })
-      .finally(() => {
-        submitBtn.disabled = false;
-      });
-  });
-
-  function refreshMediaAndShowGallery() {
+  function refreshMediaAndShowGallery(targetAlbum) {
     fetch('/api/media')
       .then((res) => res.json())
       .then((data) => {
         applyMediaData(data);
         slidesBuilt = false;
         ensureSlidesBuilt();
-        goTo(mediaData.photos.length - 1);
+
+        let targetIndex = currentSlideData.length - 1;
+        for (let i = currentSlideData.length - 1; i >= 0; i -= 1) {
+          if (currentSlideData[i].type === 'photo' && currentSlideData[i].album === targetAlbum) {
+            targetIndex = i;
+            break;
+          }
+        }
+        goTo(targetIndex);
         showScreen(scene);
       })
       .catch(() => {});

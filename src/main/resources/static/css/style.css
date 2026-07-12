@@ -187,6 +187,31 @@ body {
   to   { transform: scale(1); }
 }
 
+.slide--divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--espresso);
+}
+
+.divider {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  color: var(--bone);
+  padding: 0 24px;
+  text-align: center;
+}
+.divider__icon { color: var(--rust); }
+.divider__title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 600;
+  font-size: clamp(1.8rem, 7vw, 2.6rem);
+  margin: 0;
+}
+
 .slide__scrim {
   position: absolute;
   inset: 0;
@@ -341,7 +366,8 @@ body {
   padding: 80px 24px 40px;
 }
 
-.upload__form {
+.upload__form,
+.upload__view {
   width: min(88vw, 380px);
   display: flex;
   flex-direction: column;
@@ -407,4 +433,116 @@ body {
   font-family: var(--font-utility);
   font-size: 0.85rem;
   margin: 10px 0 0;
+}
+
+.upload__submit--ghost {
+  background: transparent;
+  border: 1px solid rgba(243,236,223,0.35);
+  color: var(--bone);
+}
+
+.upload__menu {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.upload__link {
+  align-self: flex-start;
+  font-family: var(--font-utility);
+  font-size: 0.85rem;
+  color: var(--blush);
+  background: none;
+  border: none;
+  padding: 0;
+  margin-bottom: 2px;
+  cursor: pointer;
+}
+
+.upload__subtitle {
+  text-align: center;
+  color: var(--blush);
+  font-family: var(--font-utility);
+  font-size: 0.85rem;
+  margin: -8px 0 4px;
+}
+
+/* ---------- Tarjetas de album ---------- */
+.album-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+  max-height: 50dvh;
+  overflow-y: auto;
+}
+
+.album-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 18px 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(243,236,223,0.25);
+  background: rgba(243,236,223,0.05);
+  color: var(--bone);
+  cursor: pointer;
+}
+.album-card:active { transform: scale(0.97); }
+
+.album-card__icon { color: var(--rust); }
+
+.album-card__name {
+  font-family: var(--font-utility);
+  font-size: 0.88rem;
+  text-align: center;
+  word-break: break-word;
+}
+
+.album-card__count {
+  font-family: var(--font-utility);
+  font-size: 0.72rem;
+  color: var(--blush);
+  opacity: 0.8;
+}
+
+/* ---------- Grid de fotos a borrar ---------- */
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+  max-height: 50dvh;
+  overflow-y: auto;
+}
+
+.photo-card {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  overflow: hidden;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.photo-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.photo-card__delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20,15,10,0.62);
+  color: var(--bone);
 }
